@@ -1,0 +1,119 @@
+                                                              AWS SITE TO SITE VPN CONNECTION:
+
+=======================================================================================================================================================================
+Step 1: Create Two VPC in two diffrent region let's say VPC-A in mumbai region and it is a AWS side network that have only private IP. (in my case )
+Step 2:Create VPC to another side let's say VPC-B Virginia in virginia region that is Corporate Network Side having private as well as public IP address. (in my case)
+
+Step 3:Selct CIDR range of VPC , in my case:
+
+-> VPC -A(AWS side network ): 10.0.0.0/16
+-> VPC -B(Corporate Side Network): 192.168.0.0/16
+=======================================================================================================================================================================
+Note:
+
+In VPC-A Hosts the AWS VPN gateway (AWS network side )
+IN VPC-B Hosts openswan VPN Server (Corporate network side)
+=======================================================================================================================================================================
+Step 4: Launch EC2 instance in both VPC.
+Step 5: copy the public ip of corporate network side instance  and go to aws network side .
+Step 6: create aws network side virtual private gateway.
+Step 7: attach the virtual private gateway to vpc.
+Step 8:create customer gateway and select routing as a static and paste the public ip address of corporate network side EC2 instance.
+
+Note: the corportae network side EC2 instance is act as a Router.
+-->customer gateway is not aws side network  (vpc-A) entity it is just representation of your side network means corporate network.
+-->in corporate side network present both ip private as well as public.
+
+==============================================================================================================================================================================
+
+Step 9:Create site to site VPN Connection:
+
+->selct target Gateway type
+->selcet customer Gateway type
+->select routing  options as a static 
+->fill the static ip prefix
+->inside static ip prefix paste the corporate side network (VPC-B) VPC-IP range , in my case it is (192.168.0.0/16)
+->click on create VPN connection
+
+==============================================================================================================================================================================
+
+Step 10:Login EC2 instance of corporate side network (VPC-B).
+Step 11:run the below command :
+sudo su 
+yum install openswan -y
+vim /etc/ipsec.conf
+
+Note: here inside /etc/ipsec.conf there is a line at the end "include /etc/ipsec.d/*.conf"  if this line have # sign just remove it otherwise leave it as it is and exit here.
+
+vim /etc/sysctl.conf
+
+Note: after run above command just paste the below line:
+
+net.ipv4.ip_forward = 1
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.all.send_redirects = 0
+
+Step 12: Restart network services just type below command
+
+service network restart
+
+===============================================================================================================================================================================
+
+Step 13: Go to AWS side connection in my case mumbai region -VPC-A and download the configuration file inside VPN connection option in  VPC console.
+
+Step 14:after download configuration file open the file  and make chgangesas below mentioned  and copy tunnel details.
+
+->remove "auth=esp" line because it is not supported.
+->enter the left subnet. it is a corporate side network VPC CIDR range.
+->enter the right subnet it is a AWS side network  VPC CIDR Range.
+
+Step 15: run bewlow command and paste the tunnel details here and save it and exit.
+
+vim /etc/ipsec.d/aws.conf
+
+Note : openswan does not support two tunnel if you setup both tunnel will not work.
+
+Step 16:copy the pre shared key from downloaded configuration file and paste insdie after running below command.
+
+vim /etc/ipsec.d/aws.secrets
+
+
+Step 18:now Enable Route Propogation from aws side network (VPC-A) in my case it is VPC-A
+
+Note:it is used for so that automatically learn the route of right side.
+
+Step 19: run the below command
+
+systemctl start ipsec
+systemctl status ipsec
+
+
+Step 20: now try to ping Each side VPC EC2 instance they communicate or not if they are not communicating make sure you have enable ports in security group 
+         or VPC configuration is right.
+
+
+=======================================================================================================================================================================
+
+Now if you want to extended Site to site VPN just follow the below instruction so that all another server from corporate side network can communicate to 
+to AWS side EC2 private instance and vise versa:
+
+
+
+Note : extended means more than 1 subnet communicate each other or we can access aws side network from any server of the corporate side network.
+
+now follow the below steps to configure the extened site to site vpn
+
+
+Step1:
+
+->create subnets as per requirement.
+->create route table
+->assocaite the subnet with route table.
+->launch EC2 instance with  new subnet.
+->select the security group or configure according to you.
+->select the public EC2 instance of corporate side network and selct option networking.
+->disable the option source to destination.
+->copy the private key of instance using notepad editor just select key and open as a notepad editor and copy the key
+->now provide the permission to key.
+->chmod 400 key.pem somethig like 
+->now ssh to your desired EC2 instance 
